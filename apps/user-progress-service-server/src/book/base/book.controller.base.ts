@@ -16,17 +16,35 @@ import * as errors from "../../errors";
 import { Request } from "express";
 import { plainToClass } from "class-transformer";
 import { ApiNestedQuery } from "../../decorators/api-nested-query.decorator";
+import * as nestAccessControl from "nest-access-control";
+import * as defaultAuthGuard from "../../auth/defaultAuth.guard";
 import { BookService } from "../book.service";
+import { AclValidateRequestInterceptor } from "../../interceptors/aclValidateRequest.interceptor";
+import { AclFilterResponseInterceptor } from "../../interceptors/aclFilterResponse.interceptor";
 import { BookCreateInput } from "./BookCreateInput";
 import { Book } from "./Book";
 import { BookFindManyArgs } from "./BookFindManyArgs";
 import { BookWhereUniqueInput } from "./BookWhereUniqueInput";
 import { BookUpdateInput } from "./BookUpdateInput";
 
+@swagger.ApiBearerAuth()
+@common.UseGuards(defaultAuthGuard.DefaultAuthGuard, nestAccessControl.ACGuard)
 export class BookControllerBase {
-  constructor(protected readonly service: BookService) {}
+  constructor(
+    protected readonly service: BookService,
+    protected readonly rolesBuilder: nestAccessControl.RolesBuilder
+  ) {}
+  @common.UseInterceptors(AclValidateRequestInterceptor)
   @common.Post()
   @swagger.ApiCreatedResponse({ type: Book })
+  @nestAccessControl.UseRoles({
+    resource: "Book",
+    action: "create",
+    possession: "any",
+  })
+  @swagger.ApiForbiddenResponse({
+    type: errors.ForbiddenException,
+  })
   async createBook(@common.Body() data: BookCreateInput): Promise<Book> {
     return await this.service.createBook({
       data: data,
@@ -38,9 +56,18 @@ export class BookControllerBase {
     });
   }
 
+  @common.UseInterceptors(AclFilterResponseInterceptor)
   @common.Get()
   @swagger.ApiOkResponse({ type: [Book] })
   @ApiNestedQuery(BookFindManyArgs)
+  @nestAccessControl.UseRoles({
+    resource: "Book",
+    action: "read",
+    possession: "any",
+  })
+  @swagger.ApiForbiddenResponse({
+    type: errors.ForbiddenException,
+  })
   async books(@common.Req() request: Request): Promise<Book[]> {
     const args = plainToClass(BookFindManyArgs, request.query);
     return this.service.books({
@@ -53,9 +80,18 @@ export class BookControllerBase {
     });
   }
 
+  @common.UseInterceptors(AclFilterResponseInterceptor)
   @common.Get("/:id")
   @swagger.ApiOkResponse({ type: Book })
   @swagger.ApiNotFoundResponse({ type: errors.NotFoundException })
+  @nestAccessControl.UseRoles({
+    resource: "Book",
+    action: "read",
+    possession: "own",
+  })
+  @swagger.ApiForbiddenResponse({
+    type: errors.ForbiddenException,
+  })
   async book(
     @common.Param() params: BookWhereUniqueInput
   ): Promise<Book | null> {
@@ -75,9 +111,18 @@ export class BookControllerBase {
     return result;
   }
 
+  @common.UseInterceptors(AclValidateRequestInterceptor)
   @common.Patch("/:id")
   @swagger.ApiOkResponse({ type: Book })
   @swagger.ApiNotFoundResponse({ type: errors.NotFoundException })
+  @nestAccessControl.UseRoles({
+    resource: "Book",
+    action: "update",
+    possession: "any",
+  })
+  @swagger.ApiForbiddenResponse({
+    type: errors.ForbiddenException,
+  })
   async updateBook(
     @common.Param() params: BookWhereUniqueInput,
     @common.Body() data: BookUpdateInput
@@ -105,6 +150,14 @@ export class BookControllerBase {
   @common.Delete("/:id")
   @swagger.ApiOkResponse({ type: Book })
   @swagger.ApiNotFoundResponse({ type: errors.NotFoundException })
+  @nestAccessControl.UseRoles({
+    resource: "Book",
+    action: "delete",
+    possession: "any",
+  })
+  @swagger.ApiForbiddenResponse({
+    type: errors.ForbiddenException,
+  })
   async deleteBook(
     @common.Param() params: BookWhereUniqueInput
   ): Promise<Book | null> {

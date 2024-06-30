@@ -13,16 +13,31 @@ import * as graphql from "@nestjs/graphql";
 import { GraphQLError } from "graphql";
 import { isRecordNotFoundError } from "../../prisma.util";
 import { MetaQueryPayload } from "../../util/MetaQueryPayload";
+import * as nestAccessControl from "nest-access-control";
+import * as gqlACGuard from "../../auth/gqlAC.guard";
+import { GqlDefaultAuthGuard } from "../../auth/gqlDefaultAuth.guard";
+import * as common from "@nestjs/common";
+import { AclFilterResponseInterceptor } from "../../interceptors/aclFilterResponse.interceptor";
 import { Book } from "./Book";
 import { BookCountArgs } from "./BookCountArgs";
 import { BookFindManyArgs } from "./BookFindManyArgs";
 import { BookFindUniqueArgs } from "./BookFindUniqueArgs";
 import { DeleteBookArgs } from "./DeleteBookArgs";
 import { BookService } from "../book.service";
+@common.UseGuards(GqlDefaultAuthGuard, gqlACGuard.GqlACGuard)
 @graphql.Resolver(() => Book)
 export class BookResolverBase {
-  constructor(protected readonly service: BookService) {}
+  constructor(
+    protected readonly service: BookService,
+    protected readonly rolesBuilder: nestAccessControl.RolesBuilder
+  ) {}
 
+  @graphql.Query(() => MetaQueryPayload)
+  @nestAccessControl.UseRoles({
+    resource: "Book",
+    action: "read",
+    possession: "any",
+  })
   async _booksMeta(
     @graphql.Args() args: BookCountArgs
   ): Promise<MetaQueryPayload> {
@@ -32,12 +47,24 @@ export class BookResolverBase {
     };
   }
 
+  @common.UseInterceptors(AclFilterResponseInterceptor)
   @graphql.Query(() => [Book])
+  @nestAccessControl.UseRoles({
+    resource: "Book",
+    action: "read",
+    possession: "any",
+  })
   async books(@graphql.Args() args: BookFindManyArgs): Promise<Book[]> {
     return this.service.books(args);
   }
 
+  @common.UseInterceptors(AclFilterResponseInterceptor)
   @graphql.Query(() => Book, { nullable: true })
+  @nestAccessControl.UseRoles({
+    resource: "Book",
+    action: "read",
+    possession: "own",
+  })
   async book(@graphql.Args() args: BookFindUniqueArgs): Promise<Book | null> {
     const result = await this.service.book(args);
     if (result === null) {
@@ -47,6 +74,11 @@ export class BookResolverBase {
   }
 
   @graphql.Mutation(() => Book)
+  @nestAccessControl.UseRoles({
+    resource: "Book",
+    action: "delete",
+    possession: "any",
+  })
   async deleteBook(@graphql.Args() args: DeleteBookArgs): Promise<Book | null> {
     try {
       return await this.service.deleteBook(args);

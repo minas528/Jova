@@ -16,17 +16,35 @@ import * as errors from "../../errors";
 import { Request } from "express";
 import { plainToClass } from "class-transformer";
 import { ApiNestedQuery } from "../../decorators/api-nested-query.decorator";
+import * as nestAccessControl from "nest-access-control";
+import * as defaultAuthGuard from "../../auth/defaultAuth.guard";
 import { UserProgressService } from "../userProgress.service";
+import { AclValidateRequestInterceptor } from "../../interceptors/aclValidateRequest.interceptor";
+import { AclFilterResponseInterceptor } from "../../interceptors/aclFilterResponse.interceptor";
 import { UserProgressCreateInput } from "./UserProgressCreateInput";
 import { UserProgress } from "./UserProgress";
 import { UserProgressFindManyArgs } from "./UserProgressFindManyArgs";
 import { UserProgressWhereUniqueInput } from "./UserProgressWhereUniqueInput";
 import { UserProgressUpdateInput } from "./UserProgressUpdateInput";
 
+@swagger.ApiBearerAuth()
+@common.UseGuards(defaultAuthGuard.DefaultAuthGuard, nestAccessControl.ACGuard)
 export class UserProgressControllerBase {
-  constructor(protected readonly service: UserProgressService) {}
+  constructor(
+    protected readonly service: UserProgressService,
+    protected readonly rolesBuilder: nestAccessControl.RolesBuilder
+  ) {}
+  @common.UseInterceptors(AclValidateRequestInterceptor)
   @common.Post()
   @swagger.ApiCreatedResponse({ type: UserProgress })
+  @nestAccessControl.UseRoles({
+    resource: "UserProgress",
+    action: "create",
+    possession: "any",
+  })
+  @swagger.ApiForbiddenResponse({
+    type: errors.ForbiddenException,
+  })
   async createUserProgress(
     @common.Body() data: UserProgressCreateInput
   ): Promise<UserProgress> {
@@ -40,9 +58,18 @@ export class UserProgressControllerBase {
     });
   }
 
+  @common.UseInterceptors(AclFilterResponseInterceptor)
   @common.Get()
   @swagger.ApiOkResponse({ type: [UserProgress] })
   @ApiNestedQuery(UserProgressFindManyArgs)
+  @nestAccessControl.UseRoles({
+    resource: "UserProgress",
+    action: "read",
+    possession: "any",
+  })
+  @swagger.ApiForbiddenResponse({
+    type: errors.ForbiddenException,
+  })
   async userProgresses(
     @common.Req() request: Request
   ): Promise<UserProgress[]> {
@@ -57,9 +84,18 @@ export class UserProgressControllerBase {
     });
   }
 
+  @common.UseInterceptors(AclFilterResponseInterceptor)
   @common.Get("/:id")
   @swagger.ApiOkResponse({ type: UserProgress })
   @swagger.ApiNotFoundResponse({ type: errors.NotFoundException })
+  @nestAccessControl.UseRoles({
+    resource: "UserProgress",
+    action: "read",
+    possession: "own",
+  })
+  @swagger.ApiForbiddenResponse({
+    type: errors.ForbiddenException,
+  })
   async userProgress(
     @common.Param() params: UserProgressWhereUniqueInput
   ): Promise<UserProgress | null> {
@@ -79,9 +115,18 @@ export class UserProgressControllerBase {
     return result;
   }
 
+  @common.UseInterceptors(AclValidateRequestInterceptor)
   @common.Patch("/:id")
   @swagger.ApiOkResponse({ type: UserProgress })
   @swagger.ApiNotFoundResponse({ type: errors.NotFoundException })
+  @nestAccessControl.UseRoles({
+    resource: "UserProgress",
+    action: "update",
+    possession: "any",
+  })
+  @swagger.ApiForbiddenResponse({
+    type: errors.ForbiddenException,
+  })
   async updateUserProgress(
     @common.Param() params: UserProgressWhereUniqueInput,
     @common.Body() data: UserProgressUpdateInput
@@ -109,6 +154,14 @@ export class UserProgressControllerBase {
   @common.Delete("/:id")
   @swagger.ApiOkResponse({ type: UserProgress })
   @swagger.ApiNotFoundResponse({ type: errors.NotFoundException })
+  @nestAccessControl.UseRoles({
+    resource: "UserProgress",
+    action: "delete",
+    possession: "any",
+  })
+  @swagger.ApiForbiddenResponse({
+    type: errors.ForbiddenException,
+  })
   async deleteUserProgress(
     @common.Param() params: UserProgressWhereUniqueInput
   ): Promise<UserProgress | null> {
